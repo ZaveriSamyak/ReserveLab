@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Actuarial Reserve Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-bg: #0b1220;
+  --sidebar-surface: #121b2d;
+  --sidebar-surface-2: #0f172a;
+  --sidebar-border: #24324b;
+  --sidebar-text: #e2e8f0;
+  --sidebar-muted: #94a3b8;
+  --sidebar-accent: #38bdf8;
+
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --font: 'Inter', system-ui, sans-serif;
+
+  --blue: #2563eb;
+  --blue-light: #eff6ff;
+  --green: #059669;
+  --green-light: #ecfdf5;
+  --amber: #d97706;
+  --amber-light: #fffbeb;
+  --slate: #475569;
+  --slate-light: #f8fafc;
+}
+
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── HEADER ── */
+header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%);
+  color: #fff;
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.header-icon {
+  width: 38px; height: 38px; background: rgba(255,255,255,0.12);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.header-icon svg { width: 20px; height: 20px; stroke: #93c5fd; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.4px; color: #f8fafc; }
+header p { font-size: 12px; color: #93c5fd; margin-top: 2px; font-weight: 400; }
+
+/* ── LAYOUT ── */
+.layout { display: grid; grid-template-columns: 360px 6px 1fr; flex: 1; overflow: hidden; }
+
+/* ── RESIZER ── */
+.resizer {
+  background: var(--border);
+  cursor: col-resize;
+  position: relative;
+  flex-shrink: 0;
+}
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 36px;
+  background: var(--sidebar-border);
+  border-radius: 3px;
+}
+.resizer:hover, .resizer.dragging { background: var(--blue); }
+.resizer:hover::after, .resizer.dragging::after { background: #fff; }
+.layout.resizing { cursor: col-resize; user-select: none; }
+.layout.resizing .sidebar, .layout.resizing .main { pointer-events: none; }
+
+/* ── SIDEBAR (REDESIGNED) ── */
+.sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  padding: 18px 14px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 4px; }
+
+.control-card {
+  border: 1px solid var(--sidebar-border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 20%), var(--sidebar-surface-2);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.control-card-title-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 9px;
+}
+.control-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sidebar-text);
+  letter-spacing: -0.2px;
+}
+.control-card-sub {
+  font-size: 11px; color: var(--sidebar-muted);
+}
+.step-chip {
+  font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  color: #7dd3fc;
+  background: rgba(56,189,248,0.12);
+  border: 1px solid rgba(56,189,248,0.28);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+label { display: block; font-size: 11px; color: var(--sidebar-muted); margin-bottom: 5px; font-weight: 600; }
+
+.opt-tag {
+  color: var(--sidebar-accent);
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Input controls */
+.sidebar input[type=number],
+.sidebar input[type=text],
+.sidebar textarea,
+.sidebar select {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 10px;
+  font-family: var(--font); font-size: 13px;
+  color: var(--sidebar-text);
+  background: var(--sidebar-surface);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.sidebar input:focus, .sidebar textarea:focus, .sidebar select:focus {
+  border-color: var(--sidebar-accent);
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.15);
+}
+.sidebar textarea { font-family: 'Courier New', monospace; font-size: 11px; resize: vertical; color: #cbd5e1; }
+
+/* Compact rows */
+.row { display: flex; gap: 8px; align-items: flex-end; }
+.row > * { flex: 1; }
+
+/* tabs */
+.tab-row { display: flex; border: 1px solid var(--sidebar-border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; background: var(--sidebar-surface); }
+.tab { flex: 1; padding: 7px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: transparent; color: var(--sidebar-muted); border: none; transition: all 0.15s; font-family: var(--font); }
+.tab.active { background: var(--sidebar-accent); color: #0f172a; }
+
+/* method pills */
+.method-pills { display: flex; flex-direction: column; gap: 6px; }
+.method-pill {
+  padding: 10px 11px; border-radius: 10px;
+  border: 1px solid var(--sidebar-border);
+  background: var(--sidebar-surface);
+  cursor: pointer; transition: all 0.15s;
+  text-align: left;
+}
+.method-pill:hover { border-color: var(--sidebar-accent); background: rgba(56,189,248,0.06); }
+.method-pill.active { border-color: var(--sidebar-accent); background: rgba(56,189,248,0.14); }
+.method-pill .pill-name { font-size: 13px; font-weight: 600; color: var(--sidebar-text); }
+.method-pill.active .pill-name { color: var(--sidebar-accent); }
+.method-pill .pill-desc { font-size: 11px; color: var(--sidebar-muted); margin-top: 2px; line-height: 1.35; }
+
+/* method assumptions container */
+.assumption-shell {
+  border: 1px dashed rgba(56,189,248,0.35);
+  background: rgba(56,189,248,0.05);
+  border-radius: 12px;
+  padding: 10px;
+}
+.assumption-help {
+  font-size: 11px;
+  color: #bae6fd;
+  margin-bottom: 8px;
+}
+
+/* Primary action card */
+.run-card {
+  border-color: rgba(56,189,248,0.35);
+  background: linear-gradient(180deg, rgba(56,189,248,0.10), rgba(56,189,248,0.03) 45%, transparent), var(--sidebar-surface-2);
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border: 1px solid; transition: all 0.15s; width: 100%;
+  font-family: var(--font); letter-spacing: -0.1px;
+}
+.btn-calc {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #082f49;
+  border-color: #38bdf8;
+  min-height: 46px;
+  font-size: 14px;
+  box-shadow: 0 10px 24px rgba(14,165,233,0.25);
+}
+.btn-calc:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.btn-ghost {
+  background: transparent; color: var(--sidebar-muted);
+  border-color: var(--sidebar-border); padding: 9px 12px;
+}
+.btn-ghost:hover { background: var(--sidebar-surface); color: var(--sidebar-text); }
+.btn-sm-dark {
+  background: var(--sidebar-surface); color: var(--sidebar-text); border-color: var(--sidebar-border);
+  font-size: 12px; padding: 6px 10px; width: auto; font-weight: 600;
+}
+.btn-sm-dark:hover { border-color: var(--sidebar-accent); }
+
+/* sample */
+.sample-row { display: flex; gap: 8px; align-items: center; }
+
+/* ── GRID TABLE ── */
+.grid-container { overflow-x: auto; margin-bottom: 6px; }
+table.triangle-grid { border-collapse: collapse; font-size: 11px; min-width: 100%; }
+table.triangle-grid th {
+  font-size: 10px; font-weight: 700; text-align: center;
+  padding: 5px 4px; border: 1px solid var(--sidebar-border);
+  color: var(--sidebar-muted); white-space: nowrap;
+  background: rgba(255,255,255,0.02);
+}
+table.triangle-grid td { border: 1px solid var(--sidebar-border); padding: 1px; }
+table.triangle-grid td input {
+  border: none; border-radius: 0; width: 56px; text-align: right;
+  padding: 5px 5px; font-size: 11px; font-family: 'Courier New', monospace;
+  background: #172338; color: var(--sidebar-text);
+}
+table.triangle-grid td input:focus { background: rgba(56,189,248,0.12); outline: none; color: #fff; }
+table.triangle-grid td.empty { background: rgba(255,255,255,0.01); }
+
+/* softer dev age tinting (reduced noise) */
+.dev-1 input { background: rgba(37,99,235,0.10) !important; }
+.dev-2 input { background: rgba(37,99,235,0.08) !important; }
+.dev-3 input { background: rgba(37,99,235,0.06) !important; }
+.dev-4 input { background: rgba(37,99,235,0.05) !important; }
+.dev-5, .dev-6, .dev-7, .dev-8, .dev-9, .dev-10 { }
+.dev-latest input {
+  background: rgba(5,150,105,0.14) !important;
+  border: 1px solid rgba(5,150,105,0.35) !important;
+}
+
+/* ── MAIN PANEL ── */
+.main { padding: 24px; overflow-y: auto; }
+.main::-webkit-scrollbar { width: 5px; }
+.main::-webkit-scrollbar-track { background: transparent; }
+.main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* placeholder */
+.placeholder {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; min-height: 400px; text-align: center; color: var(--muted);
+}
+.placeholder-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+.placeholder h3 { font-size: 16px; font-weight: 600; color: var(--slate); margin-bottom: 6px; }
+.placeholder p { font-size: 13px; color: var(--muted); }
+
+/* results header */
+.results-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.results-header h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.4px; }
+.method-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--blue-light); color: var(--blue); border: 1.5px solid var(--blue); }
+
+/* stat cards */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card { border-radius: 10px; padding: 16px; border: 1px solid; }
+.stat-card.s-neutral { background: var(--slate-light); border-color: var(--border); }
+.stat-card.s-green  { background: var(--green-light); border-color: #a7f3d0; }
+.stat-card.s-amber  { background: var(--amber-light); border-color: #fde68a; }
+.stat-card.s-slate  { background: #f8fafc; border-color: #cbd5e1; }
+.stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.6px; line-height: 1; margin-bottom: 4px; }
+.stat-card.s-neutral .stat-val { color: var(--blue); }
+.stat-card.s-green  .stat-val { color: var(--green); }
+.stat-card.s-amber  .stat-val { color: var(--amber); }
+.stat-card.s-slate  .stat-val { color: var(--slate); }
+.stat-lbl { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.card-title-sub { font-size: 12px; font-weight: 400; color: var(--muted); }
+
+/* card title row (title + copy-to-excel action) */
+.card-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.card-title-row .card-title { margin-bottom: 0; flex: 1; }
+
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 6px 11px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font); font-size: 11.5px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.copy-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.copy-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.copy-btn:active { transform: scale(0.96); }
+.copy-btn.copied { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.copy-btn .copy-label-default, .copy-btn .copy-label-done { display: inline-flex; align-items: center; gap: 6px; }
+.copy-btn .copy-label-done { display: none; }
+.copy-btn.copied .copy-label-default { display: none; }
+.copy-btn.copied .copy-label-done { display: inline-flex; }
+
+/* results table */
+table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.results-table th {
+  background: var(--blue); color: #fff;
+  padding: 9px 14px; text-align: right;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+}
+table.results-table th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+table.results-table th:last-child { border-radius: 0 6px 0 0; }
+table.results-table td { padding: 9px 14px; text-align: right; border-bottom: 1px solid var(--border); font-size: 13px; }
+table.results-table td:first-child { text-align: left; font-weight: 600; }
+table.results-table tr:nth-child(even) td { background: #f8fafc; }
+table.results-table tr.total-row td { background: var(--blue-light); font-weight: 700; border-top: 2px solid var(--blue); color: var(--blue); }
+.ibnr-cell { color: var(--amber); font-weight: 700; }
+.ult-cell { color: var(--green); font-weight: 600; }
+
+/* chart legend */
+.chart-legend { display: flex; gap: 20px; margin-top: 12px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+/* animated number */
+@keyframes fadeUp { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+.animate-in { animation: fadeUp 0.35s ease forwards; }
+
+/* ── RESULTS WORKSPACE ── */
+.results-wrap { display: flex; flex-direction: column; gap: 0; }
+
+.results-header { flex-wrap: wrap; }
+.results-header .rh-sub { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: auto; }
+
+/* ── MAIN TAB BAR ── */
+.workspace-nav {
+  position: sticky; top: -24px;
+  margin: -4px -4px 20px;
+  padding: 4px 4px 14px;
+  background: linear-gradient(var(--bg) 65%, rgba(241,245,249,0));
+  z-index: 5;
+}
+.main-tab-bar {
+  display: flex; gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 5px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  overflow-x: auto;
+}
+.main-tab-bar::-webkit-scrollbar { display: none; }
+.main-tab {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  white-space: nowrap;
+  padding: 9px 14px;
+  border: none; border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  letter-spacing: -0.1px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+.main-tab .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.35; flex-shrink: 0; }
+.main-tab:hover { color: var(--text); background: var(--slate-light); }
+.main-tab.active { color: var(--blue); background: var(--blue-light); box-shadow: inset 0 0 0 1px rgba(37,99,235,0.25); }
+.main-tab.active .tab-dot { background: var(--blue); opacity: 1; }
+.main-tab .tab-flag {
+  font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
+  background: rgba(217,119,6,0.14); color: var(--amber); letter-spacing: 0.3px;
+}
+
+.tab-panels { position: relative; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.tab-panel.animate-in { animation: fadeUp 0.3s ease forwards; }
+
+/* ── SUMMARY BAR (persistent across tabs) ── */
+.summary-bar { margin-bottom: 18px; }
+
+/* ── DIAGNOSTIC / VALIDATION STYLES ── */
+.diag-list { display: flex; flex-direction: column; gap: 10px; }
+.diag-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 14px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--slate-light);
+}
+.diag-item.ok { border-color: #a7f3d0; background: var(--green-light); }
+.diag-item.warn { border-color: #fde68a; background: var(--amber-light); }
+.diag-item.bad { border-color: #fecaca; background: #fef2f2; }
+.diag-icon {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff; margin-top: 1px;
+}
+.diag-item.ok .diag-icon { background: var(--green); }
+.diag-item.warn .diag-icon { background: var(--amber); }
+.diag-item.bad .diag-icon { background: #dc2626; }
+.diag-text { font-size: 12.5px; line-height: 1.55; color: var(--text); }
+.diag-text strong { font-weight: 700; }
+.diag-text .diag-sub { color: var(--muted); }
+
+table.factor-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.factor-table th {
+  background: var(--blue); color: #fff; padding: 8px 10px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+}
+table.factor-table th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+table.factor-table th:last-child { border-radius: 0 6px 0 0; }
+table.factor-table td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); font-family: 'Courier New', monospace; }
+table.factor-table td:first-child { text-align: left; font-weight: 600; font-family: var(--font); }
+table.factor-table tr:nth-child(even) td { background: #f8fafc; }
+.f-avg-row td { background: var(--blue-light) !important; font-weight: 700; color: var(--blue); }
+.f-stat-row td { background: #f8fafc; font-weight: 600; color: var(--muted); border-top: 1px solid var(--border); }
+.f-cell-ok { color: var(--text); }
+.f-cell-warn { color: var(--amber); font-weight: 700; background: var(--amber-light) !important; border-radius: 4px; }
+.f-cell-bad { color: #dc2626; font-weight: 700; background: #fef2f2 !important; border-radius: 4px; }
+.f-cell-empty { color: #cbd5e1; }
+.factor-legend { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+.factor-legend .legend-item .legend-dot.dot-ok { background: var(--blue); }
+.factor-legend .legend-item .legend-dot.dot-warn { background: var(--amber); }
+.factor-legend .legend-item .legend-dot.dot-bad { background: #dc2626; }
+
+/* ── DEVELOPMENT TRIANGLE (results tab) ── */
+.tri-scroll { overflow-x: auto; border-radius: 8px; }
+table.tri-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 12px; }
+table.tri-table th {
+  background: var(--blue); color: #fff; padding: 8px 10px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+  white-space: nowrap;
+}
+table.tri-table th:first-child {
+  text-align: left; border-radius: 6px 0 0 0;
+  position: sticky; left: 0; z-index: 3;
+}
+table.tri-table th:last-child { border-radius: 0 6px 0 0; }
+table.tri-table td {
+  padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border);
+  font-family: 'Courier New', monospace; white-space: nowrap;
+}
+table.tri-table td:first-child {
+  text-align: left; font-weight: 700; font-family: var(--font);
+  position: sticky; left: 0; z-index: 1;
+  border-right: 1px solid var(--border);
+  background: #f8fafc;
+}
+table.tri-table tr:nth-child(even) td { background: #f8fafc; }
+table.tri-table tr:nth-child(even) td:first-child { background: #f1f5f9; }
+table.tri-table tr:nth-child(odd) td:first-child { background: #ffffff; }
+.tri-cell-actual { color: var(--text); font-weight: 600; }
+.tri-cell-latest {
+  color: var(--blue); font-weight: 800;
+  background: var(--blue-light) !important;
+  box-shadow: inset 0 0 0 1.5px rgba(37,99,235,0.55);
+  border-radius: 4px;
+}
+.tri-cell-projected { color: var(--muted); font-weight: 500; background: #e9edf3 !important; }
+.tri-cell-empty { color: #cbd5e1; }
+.tri-legend { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+.tri-legend .legend-dot.dot-actual { background: var(--text); }
+.tri-legend .legend-dot.dot-diag { background: var(--blue); box-shadow: 0 0 0 2px var(--blue-light); }
+.tri-legend .legend-dot.dot-proj { background: #94a3b8; }
+
+/* ── COMPARISON STYLES ── */
+table.compare-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.compare-table th {
+  background: var(--blue); color: #fff; padding: 8px 12px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+}
+table.compare-table th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+table.compare-table th:last-child { border-radius: 0 6px 0 0; }
+table.compare-table td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+table.compare-table td:first-child { text-align: left; font-weight: 600; }
+table.compare-table tr:nth-child(even) td { background: #f8fafc; }
+table.compare-table tr.total-row td { background: var(--blue-light); font-weight: 700; border-top: 2px solid var(--blue); color: var(--blue); }
+table.compare-table td.na { color: #cbd5e1; font-style: italic; font-weight: 400; }
+.method-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.method-chip.m-cl { background: var(--blue-light); color: var(--blue); }
+.method-chip.m-bf { background: var(--green-light); color: var(--green); }
+.method-chip.m-cc { background: var(--amber-light); color: var(--amber); }
+.method-chip.m-bk { background: #f3e8ff; color: #7c3aed; }
+
+.compare-note {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 11.5px; color: var(--muted); line-height: 1.5;
+  background: var(--slate-light); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px; margin-top: 12px;
+}
+
+/* ── UNCERTAINTY STYLES ── */
+table.uncert-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.uncert-table th {
+  background: var(--blue); color: #fff; padding: 8px 12px; text-align: right;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+}
+table.uncert-table th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+table.uncert-table th:last-child { border-radius: 0 6px 0 0; }
+table.uncert-table td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+table.uncert-table td:first-child { text-align: left; font-weight: 600; }
+table.uncert-table tr:nth-child(even) td { background: #f8fafc; }
+table.uncert-table tr.total-row td { background: var(--blue-light); font-weight: 700; border-top: 2px solid var(--blue); color: var(--blue); }
+.cv-pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.cv-low { background: var(--green-light); color: var(--green); }
+.cv-mid { background: var(--amber-light); color: var(--amber); }
+.cv-high { background: #fef2f2; color: #dc2626; }
+
+.empty-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 20px; text-align: center; color: var(--muted);
+}
+.empty-tab .empty-icon { font-size: 34px; margin-bottom: 10px; opacity: 0.4; }
+.empty-tab h4 { font-size: 14px; font-weight: 700; color: var(--slate); margin-bottom: 5px; }
+.empty-tab p { font-size: 12.5px; max-width: 340px; }
+
+footer {
+  text-align: center; font-size: 11px; color: #93c5fd;
+  padding: 12px; border-top: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%);
+  flex-shrink: 0;
+}
+
+/* helper text in cards */
+.helper-inline {
+  font-size: 10.5px;
+  color: var(--sidebar-muted);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+  .resizer { display: none; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .main { padding: 16px; }
+  .workspace-nav { top: -16px; margin: -4px -4px 16px; }
+  .main-tab { padding: 9px 10px; font-size: 12px; }
+  .main-tab .tab-dot { display: none; }
+  .results-header .rh-sub { margin-left: 0; width: 100%; }
+  table.compare-table, table.uncert-table, table.factor-table { font-size: 11px; }
+}
+
+@media (max-width: 460px) {
+  .main-tab-bar { padding: 4px; }
+  .main-tab { padding: 8px 6px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-icon">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-7"/></svg>
+  </div>
+  <div>
+    <h1>Actuarial Reserve Calculator</h1>
+    <p>Enter a cumulative loss triangle &bull; Get IBNR reserves instantly</p>
+  </div>
+</header>
+
+<div class="layout">
+
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<!-- ═══════════ SIDEBAR (REDESIGNED) ═══════════ -->
+<div class="sidebar">
+
+  <!-- CARD 1 -->
+  <div class="control-card">
+    <div class="control-card-title-row">
+      <div>
+        <div class="control-card-title">Triangle Data</div>
+        <div class="control-card-sub">Enter triangle values or paste data</div>
+      </div>
+      <span class="step-chip">Step 1</span>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab active" id="tab-grid" onclick="switchTab('grid')">Grid</button>
+      <button class="tab" id="tab-paste" onclick="switchTab('paste')">Paste</button>
+    </div>
+
+    <div id="panel-grid">
+      <div class="row" style="margin-bottom:8px;">
+        <div style="max-width:130px;">
+          <label>Triangle Size</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="nrows" min="2" max="10" value="5" style="width:50px;">
+            <span style="color:var(--sidebar-muted);font-size:13px;">×</span>
+            <input type="number" id="ncols" min="2" max="10" value="5" style="width:50px;">
+          </div>
+        </div>
+        <div style="max-width:120px;">
+          <label>Origin Start</label>
+          <input type="number" id="originStart" value="2019">
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn btn-sm-dark" onclick="resizeGrid()">Resize</button>
+        </div>
+      </div>
+
+      <div class="grid-container" id="grid-wrapper"></div>
+      <p class="helper-inline">
+        <span style="display:inline-block;width:8px;height:8px;background:rgba(5,150,105,0.45);border-radius:2px;margin-right:3px;"></span>Latest diagonal
+        &nbsp;·&nbsp;
+        <span style="display:inline-block;width:8px;height:8px;background:rgba(37,99,235,0.22);border-radius:2px;margin-right:3px;"></span>Known data
+      </p>
+    </div>
+
+    <div id="panel-paste" style="display:none;">
+      <label>Tab, comma, or space separated. Empty = undeveloped. Max 10×10.</label>
+      <textarea id="paste-input" rows="7" placeholder="100 110 115&#10;200 210&#10;150"></textarea>
+      <button class="btn btn-sm-dark" style="margin-top:8px;width:100%;" onclick="loadPasteIntoGrid()">Load into Grid</button>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label>Sample Triangles</label>
+      <select onchange="loadSample(this.value)">
+        <option value="">Select a sample...</option>
+        <option value="abc">ABC Insurance (5×5)</option>
+        <option value="xyz">XYZ Reinsurance (7×7)</option>
+        <option value="small">Small Triangle (3×3)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- CARD 2 -->
+  <div class="control-card">
+    <div class="control-card-title-row">
+      <div>
+        <div class="control-card-title">Reserving Method</div>
+        <div class="control-card-sub">Choose the core reserving approach</div>
+      </div>
+      <span class="step-chip">Step 2</span>
+    </div>
+
+    <div class="method-pills" id="method-pills">
+      <div class="method-pill active" data-method="cl" onclick="selectMethod('cl')">
+        <div class="pill-name">Chain Ladder</div>
+        <div class="pill-desc">Volume-weighted LDFs · data only</div>
+      </div>
+      <div class="method-pill" data-method="bf" onclick="selectMethod('bf')">
+        <div class="pill-name">Bornhuetter-Ferguson</div>
+        <div class="pill-desc">Blends CL with an a priori loss ratio</div>
+      </div>
+      <div class="method-pill" data-method="cc" onclick="selectMethod('cc')">
+        <div class="pill-name">Cape Cod</div>
+        <div class="pill-desc">Self-calibrating ELR derived from data</div>
+      </div>
+      <div class="method-pill" data-method="bk" onclick="selectMethod('bk')">
+        <div class="pill-name">Benktander</div>
+        <div class="pill-desc">Iterated BF · converges to CL</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 3 -->
+  <div class="control-card">
+    <div class="control-card-title-row">
+      <div>
+        <div class="control-card-title">Method Assumptions</div>
+        <div class="control-card-sub">Inputs shown based on selected method</div>
+      </div>
+      <span class="step-chip">Step 3</span>
+    </div>
+
+    <div class="assumption-shell">
+      <div class="assumption-help" id="assumption-help">Set assumptions for the selected method.</div>
+
+      <!-- always available -->
+      <div id="extra-tail">
+        <label>Tail Factor</label>
+        <input type="number" id="tailFactor" value="1.000" step="0.001" min="1.000">
+      </div>
+
+      <!-- method-specific inputs -->
+      <div id="extra-apriori" style="display:none; margin-top:10px;">
+        <label>A Priori Loss Ratio (ELR)</label>
+        <input type="number" id="aPriori" value="0.70" step="0.01" min="0" max="2">
+      </div>
+
+      <div id="extra-bk" style="display:none; margin-top:10px;">
+        <label>Expected Loss Ratio (ELR)</label>
+        <input type="number" id="bkElr" value="0.70" step="0.01" min="0" max="2">
+        <label style="margin-top:10px;">Benktander Iterations</label>
+        <input type="number" id="bkIter" value="2" min="1" max="10" style="width:84px;">
+      </div>
+
+      <div id="extra-premium" style="display:none; margin-top:10px;">
+        <label>Earned Premium (by Origin Year)</label>
+        <div class="tab-row" style="margin-top:6px;">
+          <button class="tab active" id="tab-prem-grid" onclick="switchPremTab('grid')">Grid</button>
+          <button class="tab" id="tab-prem-paste" onclick="switchPremTab('paste')">Paste</button>
+        </div>
+        <div id="panel-prem-grid">
+          <div class="grid-container" id="prem-grid-wrapper"></div>
+        </div>
+        <div id="panel-prem-paste" style="display:none;">
+          <label style="font-size:10px;">One earned premium value per line, one per origin year, in order.</label>
+          <textarea id="prem-paste-input" rows="5" placeholder="1000000&#10;1050000&#10;1100000"></textarea>
+          <button class="btn btn-sm-dark" style="margin-top:6px;width:100%;" onclick="loadPastePremium()">Load into Grid</button>
+        </div>
+        <p style="font-size:10px;color:var(--sidebar-muted);margin-top:4px;" id="premium-hint">This premium is used directly in the reserve calculation — it is no longer derived from reported claims.</p>
+      </div>
+
+      <div id="extra-cc" style="display:none; margin-top:10px;">
+        <div style="background: rgba(217,119,6,0.10); border: 1px solid rgba(217,119,6,0.28); border-radius: 10px; padding: 9px 10px; font-size: 11px; color: #fbbf24; line-height: 1.5;">
+          Cape Cod ELR is auto-estimated from your data.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 4 -->
+  <div class="control-card run-card">
+    <div class="control-card-title-row" style="margin-bottom:10px;">
+      <div>
+        <div class="control-card-title">Run Calculation</div>
+        <div class="control-card-sub">Generate results in workspace</div>
+      </div>
+      <span class="step-chip">Step 4</span>
+    </div>
+
+    <button class="btn btn-calc" onclick="calculate()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      Calculate Reserves
+    </button>
+    <button class="btn btn-ghost" onclick="clearAll()" title="Clear all" style="margin-top:8px;">
+      Reset Inputs
+    </button>
+  </div>
+
+</div>
+<!-- ═══════════ END SIDEBAR ═══════════ -->
+
+<!-- ═══════════ MAIN ═══════════ -->
+<div class="resizer" id="resizer"></div>
+
+<div class="main" id="main-panel">
+  <div class="placeholder" id="placeholder">
+    <div class="placeholder-icon">◈</div>
+    <h3>Ready to calculate</h3>
+    <p>Enter a loss triangle on the left and click <strong>Calculate</strong></p>
+  </div>
+
+  <div class="results-wrap" id="results-wrap" style="display:none;">
+
+    <div class="results-header animate-in">
+      <h2>Reserving Workspace</h2>
+      <span class="method-badge" id="method-badge">Chain Ladder</span>
+      <span class="rh-sub" id="results-sub"></span>
+    </div>
+
+    <div class="summary-bar animate-in" id="summary-bar"></div>
+
+    <div class="workspace-nav">
+      <div class="main-tab-bar" id="main-tab-bar">
+        <button class="main-tab active" data-tab="results" onclick="switchMainTab('results')">
+          <span class="tab-dot"></span>Results
+        </button>
+        <button class="main-tab" data-tab="validation" onclick="switchMainTab('validation')">
+          <span class="tab-dot"></span>Validation<span class="tab-flag" id="validation-flag" style="display:none;"></span>
+        </button>
+        <button class="main-tab" data-tab="comparison" onclick="switchMainTab('comparison')">
+          <span class="tab-dot"></span>Comparison
+        </button>
+        <button class="main-tab" data-tab="uncertainty" onclick="switchMainTab('uncertainty')">
+          <span class="tab-dot"></span>Uncertainty
+        </button>
+      </div>
+    </div>
+
+    <div class="tab-panels">
+      <div class="tab-panel active" id="panel-tab-results"></div>
+      <div class="tab-panel" id="panel-tab-validation"></div>
+      <div class="tab-panel" id="panel-tab-comparison"></div>
+      <div class="tab-panel" id="panel-tab-uncertainty"></div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+<!-- ═══════════ END LAYOUT ═══════════ -->
+
+<footer>Created by Samyak Zaveri &bull; Open-source actuarial project</footer>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+let gridData = [];
+let premiumData = []; // Earned Premium, one value per origin year row — used by Bornhuetter-Ferguson
+let activeMethod = 'cl';
+let chartInstance = null;
+
+const ROWS = () => Math.max(2, Math.min(10, parseInt(document.getElementById('nrows').value) || 5));
+const COLS = () => Math.max(2, Math.min(10, parseInt(document.getElementById('ncols').value) || 5));
+
+// ─── GRID ────────────────────────────────────────────────
+function buildGrid() {
+  const r = ROWS(), c = COLS();
+  const origin = parseInt(document.getElementById('originStart').value) || 2019;
+  const wrapper = document.getElementById('grid-wrapper');
+
+  // figure out which col is the "latest diagonal" for each row
+  const latestCols = [];
+  for (let i = 0; i < r; i++) {
+    const maxDevCol = c - 1 - i;
+    latestCols.push(maxDevCol);
+  }
+
+  const devColClass = (j) => {
+    const classes = ['dev-1','dev-2','dev-3','dev-4','dev-5','dev-6','dev-7','dev-8','dev-9','dev-10'];
+    return classes[j] || '';
+  };
+
+  let html = '<table class="triangle-grid"><thead><tr>';
+  html += '<th style="text-align:left;padding-left:6px;">Origin</th>';
+  for (let j = 0; j < c; j++) html += `<th>Dev ${j + 1}</th>`;
+  html += '</tr></thead><tbody>';
+
+  for (let i = 0; i < r; i++) {
+    html += `<tr><th style="text-align:left;font-weight:600;padding:5px 6px;background:rgba(255,255,255,0.04);border:1px solid var(--sidebar-border);color:var(--sidebar-text);font-size:11px;">${origin + i}</th>`;
+    for (let j = 0; j < c; j++) {
+      const maxCol = c - 1 - i;
+      if (j > maxCol) {
+        html += `<td class="empty"></td>`;
+      } else {
+        const val = (gridData[i] && gridData[i][j] != null) ? gridData[i][j] : '';
+        const isLatest = j === maxCol;
+        const tdClass = isLatest ? 'dev-latest' : devColClass(j);
+        html += `<td class="${tdClass}"><input type="number" id="cell_${i}_${j}" value="${val}" min="0" step="any" placeholder="—" onchange="cellChanged(${i},${j},this.value)"></td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrapper.innerHTML = html;
+}
+
+function cellChanged(i, j, v) {
+  if (!gridData[i]) gridData[i] = [];
+  gridData[i][j] = v === '' ? null : parseFloat(v);
+}
+
+function resizeGrid() {
+  readGridFromDOM();
+  buildGrid();
+  buildPremiumGrid();
+}
+
+function readGridFromDOM() {
+  const r = ROWS(), c = COLS();
+  gridData = [];
+  for (let i = 0; i < r; i++) {
+    gridData[i] = [];
+    for (let j = 0; j < c; j++) {
+      const el = document.getElementById(`cell_${i}_${j}`);
+      gridData[i][j] = el && el.value !== '' ? parseFloat(el.value) : null;
+    }
+  }
+}
+
+// ─── EARNED PREMIUM GRID (for Bornhuetter-Ferguson) ─────
+function buildPremiumGrid() {
+  const r = ROWS();
+  const origin = parseInt(document.getElementById('originStart').value) || 2019;
+  const wrapper = document.getElementById('prem-grid-wrapper');
+  if (!wrapper) return;
+
+  let html = '<table class="triangle-grid"><thead><tr>';
+  html += '<th style="text-align:left;padding-left:6px;">Origin</th>';
+  html += '<th>Earned Premium</th>';
+  html += '</tr></thead><tbody>';
+
+  for (let i = 0; i < r; i++) {
+    const val = (premiumData[i] != null) ? premiumData[i] : '';
+    html += `<tr><th style="text-align:left;font-weight:600;padding:5px 6px;background:rgba(255,255,255,0.04);border:1px solid var(--sidebar-border);color:var(--sidebar-text);font-size:11px;">${origin + i}</th>`;
+    html += `<td><input type="number" id="prem_${i}" value="${val}" min="0" step="any" placeholder="—" onchange="premCellChanged(${i},this.value)"></td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrapper.innerHTML = html;
+}
+
+function premCellChanged(i, v) {
+  premiumData[i] = v === '' ? null : parseFloat(v);
+}
+
+function readPremiumFromDOM() {
+  const r = ROWS();
+  for (let i = 0; i < r; i++) {
+    const el = document.getElementById(`prem_${i}`);
+    premiumData[i] = el && el.value !== '' ? parseFloat(el.value) : null;
+  }
+}
+
+function switchPremTab(tab) {
+  document.getElementById('panel-prem-grid').style.display = tab === 'grid' ? '' : 'none';
+  document.getElementById('panel-prem-paste').style.display = tab === 'paste' ? '' : 'none';
+  document.getElementById('tab-prem-grid').classList.toggle('active', tab === 'grid');
+  document.getElementById('tab-prem-paste').classList.toggle('active', tab === 'paste');
+}
+
+function loadPastePremium() {
+  const raw = document.getElementById('prem-paste-input').value.trim();
+  if (!raw) return;
+  const r = ROWS();
+  const values = raw.split('\n').map(line => {
+    const t = line.trim().split(/[\t,\s]+/)[0];
+    return (t === '' || t === undefined || t === '-') ? null : parseFloat(t);
+  });
+  if (values.length !== r) {
+    alert(`Premium data has ${values.length} value(s) but the loss triangle has ${r} origin year(s). Please provide exactly one earned premium value per origin year.`);
+    return;
+  }
+  premiumData = values;
+  buildPremiumGrid();
+  switchPremTab('grid');
+}
+
+// ─── TABS ────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('panel-grid').style.display = tab === 'grid' ? '' : 'none';
+  document.getElementById('panel-paste').style.display = tab === 'paste' ? '' : 'none';
+  document.getElementById('tab-grid').classList.toggle('active', tab === 'grid');
+  document.getElementById('tab-paste').classList.toggle('active', tab === 'paste');
+}
+
+function loadPasteIntoGrid() {
+  const raw = document.getElementById('paste-input').value.trim();
+  if (!raw) return;
+  const rows = raw.split('\n').map(r => r.trim().split(/[\t,\s]+/).map(v => v === '' || v === '-' ? null : parseFloat(v)));
+  const r = Math.min(rows.length, 10);
+  const c = Math.min(Math.max(...rows.map(x => x.length)), 10);
+  document.getElementById('nrows').value = r;
+  document.getElementById('ncols').value = c;
+  gridData = rows.slice(0, r).map(row => row.slice(0, c));
+  buildGrid();
+  switchTab('grid');
+}
+
+// ─── METHOD PILLS ────────────────────────────────────────
+function selectMethod(m) {
+  activeMethod = m;
+  const isCl = m === 'cl';
+  document.querySelectorAll('.method-pill').forEach(p => p.classList.toggle('active', p.dataset.method === m));
+  document.getElementById('extra-apriori').style.display = (m === 'bf' || isCl) ? '' : 'none';
+  document.getElementById('extra-premium').style.display = (m === 'bf' || m === 'cc' || m === 'bk' || isCl) ? '' : 'none';
+  document.getElementById('extra-cc').style.display = m === 'cc' ? '' : 'none';
+  document.getElementById('extra-bk').style.display = m === 'bk' ? '' : 'none';
+  const premiumHint = document.getElementById('premium-hint');
+  premiumHint.style.display = isCl ? 'none' : '';
+  if (!isCl) premiumHint.textContent = "This premium is used directly in the reserve calculation — it is no longer derived from reported claims.";
+
+  const help = document.getElementById('assumption-help');
+  if (m === 'cl') help.textContent = "Chain Ladder uses development only. You can optionally enter ELR/Premium below for method comparison.";
+  if (m === 'bf') help.textContent = "Bornhuetter-Ferguson blends reported loss with an a priori expected loss.";
+  if (m === 'cc') help.textContent = "Cape Cod calibrates its ELR from your data and Earned Premium.";
+  if (m === 'bk') help.textContent = "Benktander iterates from a starting ELR toward Chain Ladder.";
+
+  if (m === 'bf' || m === 'cc' || m === 'bk' || isCl) buildPremiumGrid();
+}
+
+// ─── ACTUARIAL MATHS ─────────────────────────────────────
+function getTriangle() {
+  readGridFromDOM();
+  const r = ROWS(), c = COLS();
+  return Array.from({length: r}, (_, i) =>
+    Array.from({length: c}, (_, j) => (gridData[i] && gridData[i][j] != null) ? gridData[i][j] : null)
+  );
+}
+
+function developmentFactorsWithVolume(tri) {
+  const c = tri[0].length;
+  const ldfs = [];
+  const den = [];
+  for (let j = 0; j < c - 1; j++) {
+    let num = 0, d = 0;
+    tri.forEach(row => {
+      if (row[j] != null && row[j + 1] != null) { num += row[j + 1]; d += row[j]; }
+    });
+    ldfs.push(d > 0 ? num / d : 1.0);
+    den.push(d);
+  }
+  return { ldfsReal: ldfs, den };
+}
+
+function cumulativeCDFs(ldfs) {
+  const n = ldfs.length;
+  const cum = Array(n).fill(1);
+  cum[n - 1] = ldfs[n - 1];
+  for (let i = n - 2; i >= 0; i--) cum[i] = cum[i + 1] * ldfs[i];
+  return cum;
+}
+
+function getLatestDiag(tri) {
+  return tri.map(row => {
+    for (let j = row.length - 1; j >= 0; j--) {
+      if (row[j] != null) return { val: row[j], col: j };
+    }
+    return { val: 0, col: -1 };
+  });
+}
+
+// Builds the full r×c development triangle: actual reported values up to
+// each row's latest diagonal, and cumulative values projected forward with
+// the volume-weighted age-to-age factors beyond it. Used by the Development
+// Triangle table on the Results tab.
+function buildProjectedTriangle(tri, ldfsReal, diag) {
+  const r = tri.length, c = tri[0].length;
+  return tri.map((row, i) => {
+    const d = diag[i].col;
+    const out = new Array(c).fill(null);
+    for (let j = 0; j <= d; j++) out[j] = row[j];
+    for (let j = d + 1; j < c; j++) {
+      out[j] = (out[j - 1] != null && ldfsReal[j - 1] != null) ? out[j - 1] * ldfsReal[j - 1] : null;
+    }
+    return out;
+  });
+}
+
+const METHOD_NAMES = { cl: 'Chain Ladder', bf: 'Bornhuetter-Ferguson', cc: 'Cape Cod', bk: 'Benktander' };
+
+// Pure method calculators, independent of the DOM — reused by the primary
+// calculation, the Comparison tab (all four methods side by side) and the
+// Validation tab. Throws for bf/cc/bk when Earned Premium is missing.
+function calcMethodCore(m, r, origin, diag, cum, premiums, params) {
+  if (m === 'cl') {
+    return diag.map(({ val, col }, i) => {
+      const cdf = col >= 0 ? cum[col] : cum[0];
+      const ult = val * cdf;
+      return { year: origin + i, latest: val, ult, ibnr: ult - val };
+    });
+  }
+
+  for (let i = 0; i < r; i++) {
+    const p = premiums[i];
+    if (p == null || isNaN(p) || p < 0) {
+      throw new Error(`Missing or invalid Earned Premium for origin year ${origin + i}. Enter a non-negative Earned Premium for every origin year in the grid on the left before calculating ${METHOD_NAMES[m]} reserves.`);
+    }
+  }
+
+  if (m === 'bf') {
+    const elr = params.aPriori;
+    return diag.map(({ val, col }, i) => {
+      const pctDev = col >= 0 ? 1 / cum[col] : 1 / cum[0];
+      const unreported = 1 - pctDev;
+      const ibr = unreported * elr * premiums[i];
+      return { year: origin + i, latest: val, ult: val + ibr, ibnr: ibr };
+    });
+  }
+
+  if (m === 'cc') {
+    let numELR = 0, denELR = 0;
+    diag.forEach(({ val, col }, i) => {
+      const pct = col >= 0 ? 1 / cum[col] : 1 / cum[0];
+      numELR += val; denELR += premiums[i] * pct;
+    });
+    const elr = denELR > 0 ? numELR / denELR : 0.7;
+    const out = diag.map(({ val, col }, i) => {
+      const pct = col >= 0 ? 1 / cum[col] : 1 / cum[0];
+      const ibr = elr * premiums[i] * (1 - pct);
+      return { year: origin + i, latest: val, ult: val + ibr, ibnr: ibr };
+    });
+    out.elr = elr;
+    return out;
+  }
+
+  if (m === 'bk') {
+    const iters = params.bkIter, elr = params.bkElr;
+    let ults = diag.map(({ val, col }, i) => {
+      const pct = col >= 0 ? 1 / cum[col] : 1 / cum[0];
+      return val + (1 - pct) * elr * premiums[i];
+    });
+    for (let it = 1; it < iters; it++) {
+      ults = ults.map((u, i) => {
+        const { val, col } = diag[i];
+        const pct = col >= 0 ? 1 / cum[col] : 1 / cum[0];
+        return val + (1 - pct) * u;
+      });
+    }
+    return diag.map(({ val }, i) => ({ year: origin + i, latest: val, ult: ults[i], ibnr: ults[i] - val }));
+  }
+}
+
+// ─── MACK CHAIN LADDER UNCERTAINTY ───────────────────────
+// Classic Mack (1993) standard error of the chain ladder reserve, computed
+// straight off the entered triangle. The tail factor is treated as a fixed
+// multiplier (not a source of variance), which is a common simplification.
+function computeMackUncertainty(tri, ldfsReal, den, tail, diag, origin) {
+  const r = tri.length, c = tri[0].length;
+
+  const sigma2 = [];
+  for (let j = 0; j < c - 1; j++) {
+    let num = 0, count = 0;
+    for (let i = 0; i < r; i++) {
+      if (tri[i][j] != null && tri[i][j + 1] != null && tri[i][j] > 0) {
+        const dev = tri[i][j + 1] / tri[i][j] - ldfsReal[j];
+        num += tri[i][j] * dev * dev;
+        count++;
+      }
+    }
+    sigma2.push(count > 1 ? num / (count - 1) : null);
+  }
+  for (let j = 0; j < c - 1; j++) {
+    if (sigma2[j] == null) {
+      if (j >= 2 && sigma2[j - 1] != null && sigma2[j - 2] != null && sigma2[j - 2] > 0) {
+        sigma2[j] = Math.min(sigma2[j - 1], sigma2[j - 2], (sigma2[j - 1] * sigma2[j - 1]) / sigma2[j - 2]);
+      } else if (j >= 1 && sigma2[j - 1] != null) {
+        sigma2[j] = sigma2[j - 1];
+      } else {
+        sigma2[j] = 0;
+      }
+    }
+  }
+
+  const projected = [];
+  for (let i = 0; i < r; i++) {
+    const d = diag[i].col;
+    const row = new Array(c).fill(null);
+    if (d >= 0) row[d] = diag[i].val;
+    for (let k = d + 1; k < c; k++) {
+      row[k] = row[k - 1] != null ? row[k - 1] * ldfsReal[k - 1] : null;
+    }
+    projected.push(row);
+  }
+
+  const ultimatesNoTail = projected.map(row => row[c - 1]);
+  const ultimates = ultimatesNoTail.map(u => u != null ? u * tail : 0);
+  const reserves = diag.map((d, i) => ultimates[i] - d.val);
+
+  const seByOrigin = [];
+  for (let i = 0; i < r; i++) {
+    const d = diag[i].col;
+    if (d < 0 || d >= c - 1) { seByOrigin.push(0); continue; }
+    let sum = 0;
+    for (let k = d; k <= c - 2; k++) {
+      const f = ldfsReal[k];
+      if (!f || projected[i][k] == null || projected[i][k] <= 0 || den[k] <= 0) continue;
+      sum += (sigma2[k] / (f * f)) * (1 / projected[i][k] + 1 / den[k]);
+    }
+    const seNoTail = ultimatesNoTail[i] != null ? Math.sqrt(Math.max(0, sum)) * ultimatesNoTail[i] : 0;
+    seByOrigin.push(seNoTail * tail);
+  }
+
+  let varTotal = 0;
+  for (let i = 0; i < r; i++) varTotal += seByOrigin[i] * seByOrigin[i];
+  for (let i = 0; i < r; i++) {
+    for (let ip = i + 1; ip < r; ip++) {
+      const di = diag[i].col, dip = diag[ip].col;
+      if (di < 0 || dip < 0) continue;
+      const kStart = Math.max(di, dip);
+      let crossSum = 0;
+      for (let k = kStart; k <= c - 2; k++) {
+        const f = ldfsReal[k];
+        if (!f || den[k] <= 0) continue;
+        crossSum += sigma2[k] / (f * f * den[k]);
+      }
+      if (ultimatesNoTail[i] != null && ultimatesNoTail[ip] != null) {
+        varTotal += 2 * ultimatesNoTail[i] * ultimatesNoTail[ip] * (tail * tail) * crossSum;
+      }
+    }
+  }
+  const totalSE = Math.sqrt(Math.max(0, varTotal));
+
+  return { reserves, ultimates, seByOrigin, totalSE, totalReserve: reserves.reduce((s, x) => s + x, 0) };
+}
+
+// ─── PRIMARY CALCULATION ORCHESTRATION ──────────────────
+let currentMainTab = 'results';
+let compareChartInstance = null;
+let uncertaintyChartInstance = null;
+
+function calculate() {
+  const tri = getTriangle();
+  const r = tri.length;
+  if (r === 0 || !tri.some(row => row.some(v => v != null))) {
+    alert('Enter at least one value in the loss triangle before calculating.');
+    return;
+  }
+  const tail = parseFloat(document.getElementById('tailFactor').value) || 1.0;
+  const origin = parseInt(document.getElementById('originStart').value) || 2019;
+
+  const { ldfsReal, den } = developmentFactorsWithVolume(tri);
+  const ldfs = [...ldfsReal, tail];
+  const cum = cumulativeCDFs(ldfs);
+  const diag = getLatestDiag(tri);
+
+  readPremiumFromDOM();
+  const premiums = premiumData.slice(0, r);
+  const params = {
+    aPriori: parseFloat(document.getElementById('aPriori').value) || 0.7,
+    bkElr: parseFloat(document.getElementById('bkElr').value) || 0.7,
+    bkIter: parseInt(document.getElementById('bkIter').value) || 2
+  };
+
+  let ibnr = null, calcError = null;
+  try {
+    ibnr = calcMethodCore(activeMethod, r, origin, diag, cum, premiums, params);
+  } catch (e) {
+    calcError = e.message;
+  }
+
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('results-wrap').style.display = '';
+  document.getElementById('method-badge').textContent = METHOD_NAMES[activeMethod];
+  document.getElementById('results-sub').textContent =
+    `${r} origin year${r > 1 ? 's' : ''} · ${tri[0].length} development period${tri[0].length > 1 ? 's' : ''} · tail ${tail.toFixed(3)}`;
+
+  renderSummaryBar(ibnr, calcError);
+  renderResultsTab(tri, ldfsReal, diag, origin, ldfs, cum, ibnr, calcError);
+  renderValidationTab(tri, ldfsReal, diag, origin, ibnr, tail);
+  renderComparisonTab(r, origin, diag, cum, premiums, params);
+  renderUncertaintyTab(tri, ldfsReal, den, tail, diag, origin, r);
+
+  switchMainTab(currentMainTab);
+}
+
+// ─── TAB SWITCHING ───────────────────────────────────────
+function switchMainTab(tab) {
+  currentMainTab = tab;
+  document.querySelectorAll('.main-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    const isTarget = p.id === 'panel-tab-' + tab;
+    p.classList.toggle('active', isTarget);
+    if (isTarget) {
+      p.classList.remove('animate-in');
+      void p.offsetWidth;
+      p.classList.add('animate-in');
+    }
+  });
+}
+
+// ─── RENDER: shared helpers ──────────────────────────────
+function animateNumber(el, target) {
+  const duration = 600;
+  const start = performance.now();
+  const fmt = v => Math.round(v).toLocaleString('en-US');
+  function step(now) {
+    const p = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(target * ease);
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderSummaryBar(ibnr, calcError) {
+  const el = document.getElementById('summary-bar');
+  if (calcError) {
+    el.innerHTML = `
+      <div class="card animate-in" style="border-color:#fecaca;background:#fef2f2;margin-bottom:0;">
+        <div class="card-title" style="color:#b91c1c;">⚠ Earned Premium Required</div>
+        <div style="font-size:13px;color:#991b1b;line-height:1.6;">${calcError}</div>
+      </div>`;
+    return;
+  }
+  const totalLatest = ibnr.reduce((s, x) => s + x.latest, 0);
+  const totalUlt = ibnr.reduce((s, x) => s + x.ult, 0);
+  const totalIbnr = ibnr.reduce((s, x) => s + x.ibnr, 0);
+  const pct = totalLatest > 0 ? (totalIbnr / totalLatest * 100).toFixed(1) : '0.0';
+  el.innerHTML = `
+    <div class="stat-grid animate-in">
+      <div class="stat-card s-neutral"><div class="stat-val" id="anim-latest">—</div><div class="stat-lbl">Total Paid</div></div>
+      <div class="stat-card s-green"><div class="stat-val" id="anim-ult">—</div><div class="stat-lbl">Total Ultimate</div></div>
+      <div class="stat-card s-amber"><div class="stat-val" id="anim-ibnr">—</div><div class="stat-lbl">Total IBNR</div></div>
+      <div class="stat-card s-slate"><div class="stat-val" style="font-size:18px;">${pct}%</div><div class="stat-lbl">Total IBNR/Paid</div></div>
+    </div>`;
+  setTimeout(() => {
+    animateNumber(document.getElementById('anim-latest'), totalLatest);
+    animateNumber(document.getElementById('anim-ult'), totalUlt);
+    animateNumber(document.getElementById('anim-ibnr'), totalIbnr);
+  }, 80);
+}
+
+// ─── RENDER: Results tab ─────────────────────────────────
+// ─── COPY TABLE TO CLIPBOARD (Excel-ready TSV) ───────────
+function copyTableBtn(id) {
+  return `<button type="button" class="copy-btn" id="${id}" onclick="copyTableToClipboard('${id}')" title="Copy table — paste directly into Excel">
+    <span class="copy-label-default"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M4 16V4a2 2 0 0 1 2-2h8"></path></svg>Copy table</span>
+    <span class="copy-label-done"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></svg>Copied</span>
+  </button>`;
+}
+
+function copyTableToClipboard(btnId) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  const table = btn.closest('.card').querySelector('table');
+  if (!table) return;
+
+  const tsv = Array.from(table.rows).map(row =>
+    Array.from(row.cells).map(cell => {
+      let text = (cell.innerText || cell.textContent || '').replace(/\s+/g, ' ').trim();
+      // strip a leading '≈' / range dash artifacts isn't needed; just guard tabs/newlines for clean paste
+      return text.replace(/\t/g, ' ');
+    }).join('\t')
+  ).join('\n');
+
+  const finish = () => {
+    btn.classList.add('copied');
+    clearTimeout(btn._copyTimeout);
+    btn._copyTimeout = setTimeout(() => btn.classList.remove('copied'), 1600);
+  };
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(tsv).then(finish).catch(() => fallbackCopy(tsv, finish));
+  } else {
+    fallbackCopy(tsv, finish);
+  }
+}
+
+function fallbackCopy(text, onDone) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); onDone(); } catch (e) { /* clipboard unavailable */ }
+  document.body.removeChild(ta);
+}
+
+function renderResultsTab(tri, ldfsReal, diag, origin, ldfs, cum, ibnr, calcError) {
+  const panel = document.getElementById('panel-tab-results');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  if (calcError) {
+    panel.innerHTML = `
+      <div class="empty-tab">
+        <div class="empty-icon">◈</div>
+        <h4>No result to show yet</h4>
+        <p>${METHOD_NAMES[activeMethod]} needs Earned Premium for every origin year. Add it in the sidebar, or check the <strong>Comparison</strong> tab to see methods that don't require it.</p>
+      </div>`;
+    return;
+  }
+
+  const fmt = v => v == null ? '—' : Math.round(v).toLocaleString('en-US');
+  const fmtF = v => v.toFixed(4);
+  const totalLatest = ibnr.reduce((s, x) => s + x.latest, 0);
+  const totalUlt = ibnr.reduce((s, x) => s + x.ult, 0);
+  const totalIbnr = ibnr.reduce((s, x) => s + x.ibnr, 0);
+
+  const projTri = buildProjectedTriangle(tri, ldfsReal, diag);
+  const triCols = tri[0].length;
+  const triRows = projTri.map((row, i) => {
+    const d = diag[i].col;
+    const cells = row.map((v, j) => {
+      if (v == null) return `<td class="tri-cell-empty">—</td>`;
+      const cls = j === d ? 'tri-cell-latest' : (j <= d ? 'tri-cell-actual' : 'tri-cell-projected');
+      return `<td class="${cls}">${fmt(v)}</td>`;
+    }).join('');
+    return `<tr><td>${origin + i}</td>${cells}</tr>`;
+  }).join('');
+
+  const devTriangleCard = activeMethod === 'cl' ? `
+  <div class="card animate-in">
+    <div class="card-title-row">
+      <div class="card-title">Development Triangle<span class="card-title-sub">Observed values through the latest diagonal, projected forward to the end of the triangle</span></div>
+      ${copyTableBtn('copy-dev-triangle')}
+    </div>
+    <div class="tri-scroll">
+    <table class="tri-table">
+      <thead><tr>
+        <th>Origin</th>
+        ${Array.from({length: triCols}, (_, j) => `<th>Dev ${j + 1}</th>`).join('')}
+      </tr></thead>
+      <tbody>${triRows}</tbody>
+    </table>
+    </div>
+    <div class="tri-legend">
+      <div class="legend-item"><div class="legend-dot dot-actual"></div>Actual reported</div>
+      <div class="legend-item"><div class="legend-dot dot-diag"></div>Latest diagonal</div>
+      <div class="legend-item"><div class="legend-dot dot-proj"></div>Projected (age-to-age factors)</div>
+    </div>
+  </div>` : '';
+
+  panel.innerHTML = `
+  ${devTriangleCard}
+
+  <div class="card animate-in">
+    <div class="card-title-row">
+      <div class="card-title">Development Factors<span class="card-title-sub">Volume-weighted age-to-age, applied to the latest diagonal</span></div>
+      ${copyTableBtn('copy-dev-factors')}
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="results-table">
+      <thead><tr>
+        <th>Factor</th>
+        ${ldfs.map((_, i) => `<th>${i + 1}→${i === ldfs.length - 1 ? 'Ult' : i + 2}</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        <tr><td>Development Factors</td>${ldfs.map(f => `<td>${fmtF(f)}</td>`).join('')}</tr>
+        <tr><td>Cumulative Factors</td>${cum.map(f => `<td>${fmtF(f)}</td>`).join('')}</tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card animate-in">
+    <div class="card-title-row">
+      <div class="card-title">Reserving Results by Origin Year</div>
+      ${copyTableBtn('copy-ibnr-origin')}
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="results-table">
+      <thead><tr>
+        <th>Origin</th><th>Paid</th><th>Ultimate</th><th>IBNR</th><th>% Developed</th>
+      </tr></thead>
+      <tbody>
+        ${ibnr.map(row => `<tr>
+          <td>${row.year}</td>
+          <td>${fmt(row.latest)}</td>
+          <td class="ult-cell">${fmt(row.ult)}</td>
+          <td class="ibnr-cell">${fmt(row.ibnr)}</td>
+          <td>${row.ult > 0 ? (row.latest / row.ult * 100).toFixed(1) + '%' : '—'}</td>
+        </tr>`).join('')}
+        <tr class="total-row">
+          <td>Total</td>
+          <td>${fmt(totalLatest)}</td>
+          <td>${fmt(totalUlt)}</td>
+          <td>${fmt(totalIbnr)}</td>
+          <td>${totalUlt > 0 ? (totalLatest / totalUlt * 100).toFixed(1) + '%' : '—'}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card animate-in">
+    <div class="card-title">
+      Reserve Stack by Origin
+      <span class="card-title-sub">Paid vs IBNR</span>
+    </div>
+    <div style="position:relative;height:${Math.max(200, ibnr.length * 44 + 60)}px;">
+      <canvas id="ibnrChart"></canvas>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#2563eb;"></div>Paid</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d97706;"></div>IBNR</div>
+    </div>
+  </div>
+  `;
+
+  setTimeout(() => {
+    const ctx = document.getElementById('ibnrChart');
+    if (!ctx) return;
+    chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ibnr.map(r => String(r.year)),
+        datasets: [
+          {
+            label: 'Paid',
+            data: ibnr.map(r => Math.round(r.latest)),
+            backgroundColor: '#2563eb',
+            borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
+            borderSkipped: false,
+            stack: 'a'
+          },
+          {
+            label: 'IBNR',
+            data: ibnr.map(r => Math.round(Math.max(0, r.ibnr))),
+            backgroundColor: '#d97706',
+            borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+            borderSkipped: false,
+            stack: 'a'
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            titleColor: '#94a3b8',
+            bodyColor: '#e2e8f0',
+            padding: 12,
+            cornerRadius: 8,
+            callbacks: {
+              label: ctx => `  ${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString()}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: '#e2e8f0', drawBorder: false },
+            ticks: { color: '#64748b', font: { family: 'Inter', size: 11 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v }
+          },
+          y: {
+            stacked: true,
+            grid: { display: false },
+            ticks: { color: '#64748b', font: { family: 'Inter', size: 12, weight: '600' }, autoSkip: false }
+          }
+        }
+      }
+    });
+  }, 60);
+}
+
+// ─── RENDER: Validation tab ──────────────────────────────
+function computeFactorGrid(tri, ldfsReal) {
+  const r = tri.length, c = tri[0].length;
+  const grid = [];
+  for (let i = 0; i < r; i++) {
+    const row = [];
+    for (let j = 0; j < c - 1; j++) {
+      if (tri[i][j] != null && tri[i][j + 1] != null && tri[i][j] !== 0) {
+        row.push(tri[i][j + 1] / tri[i][j]);
+      } else {
+        row.push(null);
+      }
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+function colStats(grid, c, r) {
+  const means = [], stdevs = [], covs = [];
+  for (let j = 0; j < c - 1; j++) {
+    const vals = [];
+    for (let i = 0; i < r; i++) { if (grid[i][j] != null) vals.push(grid[i][j]); }
+    if (vals.length === 0) { means.push(null); stdevs.push(null); covs.push(null); continue; }
+    const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const variance = vals.length > 1 ? vals.reduce((s, v) => s + (v - mean) * (v - mean), 0) / (vals.length - 1) : 0;
+    const sd = Math.sqrt(variance);
+    means.push(mean);
+    stdevs.push(sd);
+    covs.push(mean !== 0 ? sd / mean : null);
+  }
+  return { means, stdevs, covs };
+}
+
+function renderValidationTab(tri, ldfsReal, diag, origin, ibnr, tail) {
+  const panel = document.getElementById('panel-tab-validation');
+  const r = tri.length, c = tri[0].length;
+  const grid = computeFactorGrid(tri, ldfsReal);
+  const { means, stdevs, covs } = colStats(grid, c, r);
+
+  let outlierCount = 0;
+  let decreaseCount = 0;
+  const decreaseDetails = [];
+  let factorRows = '';
+  for (let i = 0; i < r; i++) {
+    factorRows += `<tr><td>${origin + i}</td>`;
+    for (let j = 0; j < c - 1; j++) {
+      const f = grid[i][j];
+      if (f == null) { factorRows += `<td class="f-cell-empty">—</td>`; continue; }
+      const avg = ldfsReal[j];
+      const dev = avg > 0 ? Math.abs(f - avg) / avg : 0;
+      let cls = 'f-cell-ok';
+      if (f < 1) {
+        cls = 'f-cell-bad';
+        decreaseCount++;
+        decreaseDetails.push(`origin ${origin + i} (${j + 1}→${j + 2})`);
+      } else if (dev > 0.30) {
+        cls = 'f-cell-bad'; outlierCount++;
+      } else if (dev > 0.15) {
+        cls = 'f-cell-warn'; outlierCount++;
+      }
+      factorRows += `<td class="${cls}">${f.toFixed(3)}</td>`;
+    }
+    factorRows += `</tr>`;
+  }
+  const avgRow = `<tr class="f-avg-row"><td>Selected LDF</td>${ldfsReal.map(f => `<td>${f.toFixed(3)}</td>`).join('')}</tr>`;
+  const sdRow = `<tr class="f-stat-row"><td>Std. Deviation</td>${stdevs.map(v => `<td>${v != null ? v.toFixed(3) : '—'}</td>`).join('')}</tr>`;
+  const covRow = `<tr class="f-stat-row"><td>Coeff. of Variation</td>${covs.map(v => `<td>${v != null ? (v * 100).toFixed(1) + '%' : '—'}</td>`).join('')}</tr>`;
+
+  // missing-value gap check: a null cell inside the reported region of a row
+  // (i.e. before that row's latest diagonal), rather than the expected
+  // not-yet-reported cells beyond it.
+  const missingGaps = [];
+  diag.forEach((d, i) => {
+    for (let j = 0; j < d.col; j++) {
+      if (tri[i][j] == null) missingGaps.push({ year: origin + i, period: j + 1 });
+    }
+  });
+
+  const diags = [];
+  if (ibnr) {
+    const negatives = ibnr.filter(x => x.ibnr < 0);
+    if (negatives.length > 0) {
+      diags.push({ level: 'bad', text: `<strong>${negatives.length} origin year${negatives.length > 1 ? 's' : ''}</strong> show negative IBNR (${negatives.map(x => x.year).join(', ')}) — reported losses already exceed the projected ultimate. Review the a priori ELR or tail assumption.` });
+    } else {
+      diags.push({ level: 'ok', text: `No origin year shows negative IBNR under the selected method.` });
+    }
+  }
+  if (tail < 1.0) {
+    diags.push({ level: 'warn', text: `Tail factor is set below 1.000 (${tail.toFixed(3)}), which implies losses develop downward beyond the triangle. Confirm this is intentional.` });
+  } else if (tail === 1.0) {
+    diags.push({ level: 'ok', text: `Tail factor is 1.000 — the triangle is assumed to be fully developed with no further tail.` });
+  } else {
+    diags.push({ level: 'ok', text: `Tail factor of ${tail.toFixed(3)} applied beyond the last development period.` });
+  }
+  if (missingGaps.length > 0) {
+    const sample = missingGaps.slice(0, 3).map(g => `origin ${g.year}, period ${g.period}`).join('; ');
+    diags.push({ level: 'bad', text: `<strong>${missingGaps.length} missing value${missingGaps.length > 1 ? 's' : ''}</strong> found inside the reported triangle (e.g. ${sample}${missingGaps.length > 3 ? ', …' : ''}) — fill these gaps before relying on the development factors.` });
+  } else {
+    diags.push({ level: 'ok', text: `No missing values inside the reported portion of the triangle.` });
+  }
+  if (decreaseCount > 0) {
+    const sample = decreaseDetails.slice(0, 3).join(', ');
+    diags.push({ level: 'bad', text: `<strong>${decreaseCount} age-to-age factor${decreaseCount > 1 ? 's' : ''} below 1.000</strong> (${sample}${decreaseDetails.length > 3 ? ', …' : ''}) — cumulative claims decreased between development periods. Confirm this is expected (e.g. recoveries or salvage) rather than a data error.` });
+  } else {
+    diags.push({ level: 'ok', text: `No individual age-to-age factor falls below 1.000 — cumulative claims are non-decreasing across all reported periods.` });
+  }
+  if (outlierCount > 0) {
+    diags.push({ level: outlierCount > 3 ? 'bad' : 'warn', text: `<strong>${outlierCount} individual age-to-age factor${outlierCount > 1 ? 's' : ''}</strong> deviate by more than 15% from the selected volume-weighted LDF — highlighted in the grid below.` });
+  } else {
+    diags.push({ level: 'ok', text: `Individual age-to-age factors are consistent with the selected development pattern (within 15%).` });
+  }
+
+  const iconFor = l => l === 'ok' ? '✓' : l === 'warn' ? '!' : '✕';
+
+  panel.innerHTML = `
+    <div class="card animate-in">
+      <div class="card-title">Data Quality Checks</div>
+      <div class="diag-list">
+        ${diags.map(d => `<div class="diag-item ${d.level}"><div class="diag-icon">${iconFor(d.level)}</div><div class="diag-text">${d.text}</div></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card animate-in">
+      <div class="card-title-row">
+        <div class="card-title">Individual Age-to-Age Factors<span class="card-title-sub">By origin year, compared to the selected LDF, with stability statistics below</span></div>
+        ${copyTableBtn('copy-factor-table')}
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="factor-table">
+          <thead><tr><th style="text-align:left;">Origin</th>${ldfsReal.map((_, j) => `<th>${j + 1}→${j + 2}</th>`).join('')}</tr></thead>
+          <tbody>${factorRows}${avgRow}${sdRow}${covRow}</tbody>
+        </table>
+      </div>
+      <div class="factor-legend">
+        <div class="legend-item"><div class="legend-dot dot-ok"></div>Within 15% of LDF</div>
+        <div class="legend-item"><div class="legend-dot dot-warn"></div>15–30% deviation</div>
+        <div class="legend-item"><div class="legend-dot dot-bad"></div>Over 30% deviation, or below 1.000</div>
+      </div>
+      <div class="compare-note">The coefficient of variation (CoV = standard deviation ÷ mean) measures how stable each development period is — a low CoV means the individual factors cluster tightly around the mean; a high CoV means development varies a lot from year to year.</div>
+    </div>
+  `;
+
+  const flagEl = document.getElementById('validation-flag');
+  const flagCount = diags.filter(d => d.level !== 'ok').length;
+  if (flagCount > 0) {
+    flagEl.style.display = '';
+    flagEl.textContent = flagCount;
+  } else {
+    flagEl.style.display = 'none';
+  }
+}
+
+// ─── RENDER: Comparison tab ──────────────────────────────
+function renderComparisonTab(r, origin, diag, cum, premiums, params) {
+  const panel = document.getElementById('panel-tab-comparison');
+  const methods = ['cl', 'bf', 'cc', 'bk'];
+  const results = {};
+  methods.forEach(m => {
+    try { results[m] = calcMethodCore(m, r, origin, diag, cum, premiums, params); }
+    catch (e) { results[m] = null; }
+  });
+
+  const fmt = v => v == null ? '—' : Math.round(v).toLocaleString('en-US');
+  const fmtPct = v => (v * 100).toFixed(1) + '%';
+  const chipClass = { cl: 'm-cl', bf: 'm-bf', cc: 'm-cc', bk: 'm-bk' };
+  const availableMethods = methods.filter(m => results[m]);
+  const missingMethods = methods.filter(m => !results[m]);
+
+  const assumptionItems = [];
+  if (results.bf) {
+    assumptionItems.push(`<div class="diag-item ok"><div class="diag-icon">✓</div><div class="diag-text"><strong>Bornhuetter-Ferguson</strong> used the a priori ELR entered in the sidebar: <strong>${fmtPct(params.aPriori)}</strong>.</div></div>`);
+  }
+  if (results.cc) {
+    assumptionItems.push(`<div class="diag-item ok"><div class="diag-icon">✓</div><div class="diag-text"><strong>Cape Cod</strong> auto-estimated its ELR from the entered Earned Premium and reported development: <strong>${fmtPct(results.cc.elr)}</strong>.</div></div>`);
+  }
+  if (results.bk) {
+    assumptionItems.push(`<div class="diag-item ok"><div class="diag-icon">✓</div><div class="diag-text"><strong>Benktander</strong> ran <strong>${params.bkIter} iteration${params.bkIter > 1 ? 's' : ''}</strong> starting from an ELR of <strong>${fmtPct(params.bkElr)}</strong> (each further iteration moves the estimate closer to Chain Ladder).</div></div>`);
+  }
+
+  let rowsHtml = '';
+  for (let i = 0; i < r; i++) {
+    rowsHtml += `<tr><td>${origin + i}</td>`;
+    methods.forEach(m => {
+      rowsHtml += results[m] ? `<td>${fmt(results[m][i].ult)}</td>` : `<td class="na">n/a</td>`;
+    });
+    rowsHtml += `</tr>`;
+  }
+  let totalsRow = `<tr class="total-row"><td>Total Ultimate</td>`;
+  methods.forEach(m => {
+    totalsRow += results[m] ? `<td>${fmt(results[m].reduce((s, x) => s + x.ult, 0))}</td>` : `<td class="na">n/a</td>`;
+  });
+  totalsRow += `</tr>`;
+  let ibnrTotalsRow = `<tr><td>Total IBNR</td>`;
+  methods.forEach(m => {
+    ibnrTotalsRow += results[m] ? `<td class="ibnr-cell">${fmt(results[m].reduce((s, x) => s + x.ibnr, 0))}</td>` : `<td class="na">n/a</td>`;
+  });
+  ibnrTotalsRow += `</tr>`;
+
+  panel.innerHTML = `
+    ${assumptionItems.length > 0 ? `
+    <div class="card animate-in">
+      <div class="card-title">Method Assumptions Used</div>
+      <div class="diag-list">${assumptionItems.join('')}</div>
+    </div>` : ''}
+
+    <div class="card animate-in">
+      <div class="card-title-row">
+        <div class="card-title">
+          Ultimate Losses by Method
+          <span class="card-title-sub">Same triangle, four reserving approaches</span>
+        </div>
+        ${copyTableBtn('copy-compare-table')}
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+        ${methods.map(m => `<span class="method-chip ${chipClass[m]}">${METHOD_NAMES[m]}</span>`).join('')}
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="compare-table">
+          <thead><tr><th>Origin</th>${methods.map(m => `<th>${METHOD_NAMES[m]}</th>`).join('')}</tr></thead>
+          <tbody>${rowsHtml}${totalsRow}${ibnrTotalsRow}</tbody>
+        </table>
+      </div>
+      ${missingMethods.length > 0 ? `<div class="compare-note">⚠ ${missingMethods.map(m => METHOD_NAMES[m]).join(', ')} ${missingMethods.length > 1 ? 'require' : 'requires'} Earned Premium for every origin year — add it in the sidebar to include ${missingMethods.length > 1 ? 'them' : 'it'} in the comparison.</div>` : ''}
+    </div>
+
+    <div class="card animate-in">
+      <div class="card-title">Total IBNR by Method</div>
+      <div style="position:relative;height:220px;">
+        <canvas id="compareChart"></canvas>
+      </div>
+    </div>
+  `;
+
+  if (compareChartInstance) { compareChartInstance.destroy(); compareChartInstance = null; }
+  setTimeout(() => {
+    const ctx = document.getElementById('compareChart');
+    if (!ctx || availableMethods.length === 0) return;
+    const labels = availableMethods.map(m => METHOD_NAMES[m]);
+    const data = availableMethods.map(m => Math.round(results[m].reduce((s, x) => s + x.ibnr, 0)));
+    const colors = { cl: '#2563eb', bf: '#059669', cc: '#d97706', bk: '#7c3aed' };
+    compareChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: availableMethods.map(m => colors[m]), borderRadius: 6, maxBarThickness: 60 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a', titleColor: '#94a3b8', bodyColor: '#e2e8f0', padding: 12, cornerRadius: 8,
+            callbacks: { label: ctx => `  Total IBNR: ${ctx.parsed.y.toLocaleString()}` }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'Inter', size: 12, weight: '600' } } },
+          y: { grid: { color: '#e2e8f0', drawBorder: false }, ticks: { color: '#64748b', font: { family: 'Inter', size: 11 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v } }
+        }
+      }
+    });
+  }, 60);
+}
+
+// ─── RENDER: Uncertainty tab ─────────────────────────────
+function renderUncertaintyTab(tri, ldfsReal, den, tail, diag, origin, r) {
+  const panel = document.getElementById('panel-tab-uncertainty');
+  const c = tri[0].length;
+
+  if (c < 3) {
+    panel.innerHTML = `<div class="empty-tab"><div class="empty-icon">◈</div><h4>Not enough development periods</h4><p>Mack's chain ladder standard error needs at least two age-to-age transitions. Add more development columns to see an uncertainty range.</p></div>`;
+    if (uncertaintyChartInstance) { uncertaintyChartInstance.destroy(); uncertaintyChartInstance = null; }
+    return;
+  }
+
+  const { reserves, seByOrigin, totalSE, totalReserve } = computeMackUncertainty(tri, ldfsReal, den, tail, diag, origin);
+  const fmt = v => Math.round(v).toLocaleString('en-US');
+  const z = 1.645;
+  const cvClass = cv => cv == null ? '' : cv < 0.15 ? 'cv-low' : cv < 0.40 ? 'cv-mid' : 'cv-high';
+
+  let rows = '';
+  for (let i = 0; i < r; i++) {
+    const res = reserves[i], se = seByOrigin[i];
+    const cv = res !== 0 ? Math.abs(se / res) : null;
+    const lo = res - z * se, hi = res + z * se;
+    rows += `<tr>
+      <td>${origin + i}</td>
+      <td>${fmt(res)}</td>
+      <td>${fmt(se)}</td>
+      <td>${cv != null ? `<span class="cv-pill ${cvClass(cv)}">${(cv * 100).toFixed(0)}%</span>` : '—'}</td>
+      <td>${fmt(lo)} – ${fmt(hi)}</td>
+    </tr>`;
+  }
+  const totalCV = totalReserve !== 0 ? Math.abs(totalSE / totalReserve) : null;
+  const totalLo = totalReserve - z * totalSE, totalHi = totalReserve + z * totalSE;
+  rows += `<tr class="total-row">
+    <td>Total</td><td>${fmt(totalReserve)}</td><td>${fmt(totalSE)}</td>
+    <td>${totalCV != null ? `<span class="cv-pill ${cvClass(totalCV)}">${(totalCV * 100).toFixed(0)}%</span>` : '—'}</td>
+    <td>${fmt(totalLo)} – ${fmt(totalHi)}</td>
+  </tr>`;
+
+  panel.innerHTML = `
+    <div class="card animate-in">
+      <div class="card-title-row">
+        <div class="card-title">Reserve Uncertainty<span class="card-title-sub">Mack's chain ladder standard error, based on the triangle's own volatility</span></div>
+        ${copyTableBtn('copy-uncert-table')}
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="uncert-table">
+          <thead><tr><th>Origin</th><th>Reserve</th><th>Std. Error</th><th>CV</th><th>~90% Range</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="compare-note">This view always uses a chain-ladder development pattern, independent of the reserving method selected in the sidebar, and applies the tail factor as a fixed multiplier rather than a source of uncertainty. Treat the ranges as indicative, not a substitute for a full bootstrap or GLM-based reserve risk analysis.</div>
+    </div>
+
+    <div class="card animate-in">
+      <div class="card-title">Reserve Range by Origin Year<span class="card-title-sub">~90% interval around the central estimate (dot), coloured by volatility</span></div>
+      <div style="position:relative;height:${Math.max(220, r * 50 + 80)}px;">
+        <canvas id="uncertaintyChart"></canvas>
+      </div>
+      <div class="factor-legend" style="margin-top:14px;">
+        <div class="legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid #1d4ed8;box-shadow:0 0 0 1px rgba(0,0,0,0.06);"></span>Central estimate</div>
+        <div class="legend-item"><div class="legend-dot dot-ok" style="background:#059669;"></div>Low volatility (CV &lt; 15%)</div>
+        <div class="legend-item"><div class="legend-dot dot-warn"></div>Medium volatility (15–40%)</div>
+        <div class="legend-item"><div class="legend-dot dot-bad"></div>High volatility (&gt; 40%)</div>
+      </div>
+    </div>
+  `;
+
+  if (uncertaintyChartInstance) { uncertaintyChartInstance.destroy(); uncertaintyChartInstance = null; }
+  setTimeout(() => {
+    const ctx = document.getElementById('uncertaintyChart');
+    if (!ctx) return;
+
+    // per-origin rows only — the Total row from the table above is not plotted
+    const labels = Array.from({ length: r }, (_, i) => String(origin + i));
+    const centrals = [...reserves];
+    const ses = [...seByOrigin];
+    const cvs = centrals.map((res, i) => res !== 0 ? Math.abs(ses[i] / res) : null);
+    const ranges = centrals.map((res, i) => [Math.round(res - z * ses[i]), Math.round(res + z * ses[i])]);
+
+    const palette = (cv) => {
+      if (cv == null) return { border: '#94a3b8', bg: 'rgba(148,163,184,0.22)', dot: '#64748b' };
+      if (cv < 0.15) return { border: '#059669', bg: 'rgba(5,150,105,0.22)', dot: '#1d4ed8' };
+      if (cv < 0.40) return { border: '#d97706', bg: 'rgba(217,119,6,0.22)', dot: '#1d4ed8' };
+      return { border: '#dc2626', bg: 'rgba(220,38,38,0.22)', dot: '#1d4ed8' };
+    };
+    const colors = centrals.map((_, i) => palette(cvs[i]));
+
+    // draws a white dot (outlined in blue) at the central estimate, on top of each range bar
+    const centralMarkerPlugin = {
+      id: 'centralMarker',
+      afterDatasetsDraw(chart) {
+        const meta = chart.getDatasetMeta(0);
+        const xScale = chart.scales.x;
+        const c = chart.ctx;
+        c.save();
+        meta.data.forEach((bar, i) => {
+          const px = xScale.getPixelForValue(centrals[i]);
+          const py = bar.y;
+          c.beginPath();
+          c.arc(px, py, 5.5, 0, Math.PI * 2);
+          c.fillStyle = '#ffffff';
+          c.fill();
+          c.lineWidth = 2.5;
+          c.strokeStyle = colors[i].dot;
+          c.stroke();
+        });
+        c.restore();
+      }
+    };
+
+    uncertaintyChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Reserve range (~90%)',
+          data: ranges,
+          backgroundColor: colors.map(c => c.bg),
+          borderColor: colors.map(c => c.border),
+          borderWidth: 1.5,
+          borderRadius: 6,
+          barThickness: 20,
+          borderSkipped: false
+        }]
+      },
+      plugins: [centralMarkerPlugin],
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { right: 10 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a', titleColor: '#93c5fd', titleFont: { weight: '700' }, bodyColor: '#e2e8f0', padding: 12, cornerRadius: 8, displayColors: false,
+            callbacks: {
+              title: items => `Origin ${items[0].label}`,
+              label: ctx => {
+                const i = ctx.dataIndex;
+                const cv = cvs[i];
+                return [
+                  `Central estimate:  ${fmt(centrals[i])}`,
+                  `90% range:  ${fmt(ranges[i][0])} – ${fmt(ranges[i][1])}`,
+                  cv != null ? `Volatility (CV):  ${(cv * 100).toFixed(0)}%` : null
+                ].filter(Boolean);
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: '#e2e8f0', drawBorder: false },
+            border: { display: false },
+            title: { display: true, text: 'Reserve Amount', color: '#64748b', font: { family: 'Inter', size: 11, weight: '600' } },
+            ticks: { color: '#64748b', font: { family: 'Inter', size: 11 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v }
+          },
+          y: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: '#64748b',
+              font: { family: 'Inter', size: 12, weight: '600' }
+            }
+          }
+        }
+      }
+    });
+  }, 60);
+}
+
+// ─── CLEAR ───────────────────────────────────────────────
+function clearAll() {
+  gridData = [];
+  premiumData = [];
+  buildGrid();
+  buildPremiumGrid();
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  if (compareChartInstance) { compareChartInstance.destroy(); compareChartInstance = null; }
+  if (uncertaintyChartInstance) { uncertaintyChartInstance.destroy(); uncertaintyChartInstance = null; }
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('results-wrap').style.display = 'none';
+  ['results', 'validation', 'comparison', 'uncertainty'].forEach(t => {
+    document.getElementById('panel-tab-' + t).innerHTML = '';
+  });
+  document.getElementById('summary-bar').innerHTML = '';
+  const flagEl = document.getElementById('validation-flag');
+  if (flagEl) flagEl.style.display = 'none';
+  currentMainTab = 'results';
+  switchMainTab('results');
+}
+
+// ─── SAMPLES ─────────────────────────────────────────────
+const SAMPLES = {
+  abc: { rows:5, cols:5, origin:2019, data:[
+    [357848,1124788,1735330,2218270,2745596],
+    [352118,1236139,2170033,3353322,null],
+    [290507,1292306,2218525,null,null],
+    [310608,1418858,null,null,null],
+    [443160,null,null,null,null]
+  ], premium: [3800000, 4000000, 4200000, 4400000, 4600000], elr: 0.70 },
+  xyz: { rows:7, cols:7, origin:2017, data:[
+    [153638,188412,210172,211422,212172,212172,212172],
+    [178536,226412,243699,250832,252832,252832,null],
+    [210172,265388,289661,295627,297627,null,null],
+    [178536,225412,246378,254378,null,null,null],
+    [183536,231412,252378,null,null,null,null],
+    [193536,244412,null,null,null,null,null],
+    [201536,null,null,null,null,null,null]
+  ], premium: [300000, 310000, 320000, 330000, 340000, 350000, 360000], elr: 0.68 },
+  small: { rows:3, cols:3, origin:2022, data:[
+    [100,150,165],[120,180,null],[140,null,null]
+  ], premium: [220, 240, 260], elr: 0.65 }
+};
+
+function loadSample(key) {
+  if (!key) return;
+  const s = SAMPLES[key];
+  document.getElementById('nrows').value = s.rows;
+  document.getElementById('ncols').value = s.cols;
+  document.getElementById('originStart').value = s.origin;
+  gridData = s.data.map(row => [...row]);
+  premiumData = (s.premium || []).slice();
+  buildGrid();
+  buildPremiumGrid();
+  if (s.elr != null) {
+    document.getElementById('aPriori').value = s.elr;
+    document.getElementById('bkElr').value = s.elr;
+  }
+  switchTab('grid');
+}
+
+// ─── INIT ────────────────────────────────────────────────
+buildGrid();
+selectMethod('cl');
+
+// ─── RESIZABLE SIDEBAR ──────────────────────────────────
+(function() {
+  const layout = document.querySelector('.layout');
+  const resizer = document.getElementById('resizer');
+  const sidebar = document.querySelector('.sidebar');
+  let startX, startWidth;
+
+  function onMouseMove(e) {
+    const delta = e.clientX - startX;
+    let newWidth = startWidth + delta;
+    newWidth = Math.max(200, Math.min(newWidth, window.innerWidth - 300));
+    layout.style.gridTemplateColumns = newWidth + 'px 6px 1fr';
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    layout.classList.remove('resizing');
+    resizer.classList.remove('dragging');
+  }
+
+  resizer.addEventListener('mousedown', function(e) {
+    startX = e.clientX;
+    startWidth = sidebar.getBoundingClientRect().width;
+    layout.classList.add('resizing');
+    resizer.classList.add('dragging');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
+  });
+
+  // touch support
+  resizer.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startWidth = sidebar.getBoundingClientRect().width;
+    layout.classList.add('resizing');
+    resizer.classList.add('dragging');
+    document.addEventListener('touchmove', onTouchMove);
+    document.addEventListener('touchend', onTouchEnd);
+  });
+  function onTouchMove(e) {
+    const delta = e.touches[0].clientX - startX;
+    let newWidth = startWidth + delta;
+    newWidth = Math.max(200, Math.min(newWidth, window.innerWidth - 300));
+    layout.style.gridTemplateColumns = newWidth + 'px 6px 1fr';
+  }
+  function onTouchEnd() {
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('touchend', onTouchEnd);
+    layout.classList.remove('resizing');
+    resizer.classList.remove('dragging');
+  }
+})();
+</script>
+</body>
+</html>
